@@ -1,8 +1,9 @@
 from django.shortcuts import render
 from django.views.generic import ListView, DetailView, CreateView, UpdateView, DeleteView
 from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
-from .models import Book, Author
-from .serializers import AuthorSerializer
+from rest_framework import viewsets
+from .models import Book, Author, Task
+from .serializers import AuthorSerializer, TaskSerializer
 from .forms import BookForm
 
 class BookListView(ListView):
@@ -37,3 +38,44 @@ class AuthorListCreateView(ListCreateAPIView):
 class AuthorRetrieveUpdateDestroyView(RetrieveUpdateDestroyAPIView):
     queryset = Author.objects.all()
     serializer_class = AuthorSerializer
+
+class TaskViewSet(viewsets.ModelViewSet):
+    """
+    ViewSet для управления задачами (To-Do) с полным CRUD функционалом.
+    
+    Поддерживает:
+    - Создание задач с различными приоритетами и статусами
+    - Обновление статуса через PATCH запросы
+    - Сортировку по приоритету и дате создания
+    - Удаление задач
+    """
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    
+    def get_queryset(self):
+        """
+        Переопределяем queryset для настройки сортировки:
+        1. По приоритету (HIGH -> MEDIUM -> LOW)
+        2. По дате создания (новые сверху)
+        """
+        return Task.objects.all().order_by(
+            '-priority',  # Высокий приоритет сверху
+            '-created_at'  # Новые задачи сверху
+        )
+    
+    def perform_create(self, serializer):
+        """
+        Автоматически устанавливаем значения по умолчанию при создании
+        """
+        serializer.save(
+            priority='MEDIUM',  # По умолчанию средний приоритет
+            status='PENDING'    # По умолчанию ожидает
+        )
+    
+    def get_serializer_context(self):
+        """
+        Передаем request в контекст сериализатора для расширенной функциональности
+        """
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
